@@ -15,6 +15,24 @@ from utils.acestream_handler import AceStreamHandler
 
 
 
+class MiniPlayerWindow(QWidget):
+    def __init__(self, parent_app):
+        super().__init__()
+        self.parent_app = parent_app
+        self.setWindowTitle("Mini Player")
+        self.setWindowIcon(QIcon("assets/icon.ico"))
+        self.resize(480, 270)
+        # Ventana siempre visible y sin marco (opcional, aquí con marco para poder moverla fácil)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.setStyleSheet("background-color: black;")
+
+    def closeEvent(self, event):
+        # Al cerrar la ventana, devolvemos el video a la app principal
+        self.parent_app.stop_mini_mode()
+        event.accept()
+
 class F1TVApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -28,6 +46,7 @@ class F1TVApp(QMainWindow):
         self.player = self.instance.media_player_new()
         
         self.channel_widgets = []
+        self.mini_window = None # Referencia al mini player
         
         self.init_ui()
         
@@ -104,9 +123,9 @@ class F1TVApp(QMainWindow):
 
         # === ZONA DERECHA (VIDEO + OVERLAY) ===
         right_area = QWidget()
-        right_layout = QVBoxLayout(right_area)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(0)
+        self.right_layout = QVBoxLayout(right_area) # Hacer self para poder reinsertar el video
+        self.right_layout.setContentsMargins(0, 0, 0, 0)
+        self.right_layout.setSpacing(0)
 
         # 1. Header Overlay
         self.header_vid = QFrame()
@@ -151,6 +170,14 @@ class F1TVApp(QMainWindow):
         btn_vol = QPushButton("VOL")
         btn_vol.setProperty("class", "ControlBtn")
 
+        # Botón Mini Player
+        self.btn_mini = QPushButton(" ❐ ") 
+        self.btn_mini.setFixedSize(40, 40)
+        self.btn_mini.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_mini.setStyleSheet("color: white; font-size: 16px; background: transparent; border: none;")
+        self.btn_mini.setToolTip("Mini Player (Siempre visible)")
+        self.btn_mini.clicked.connect(self.toggle_mini_player)
+
         # Botón Pantalla Completa
         self.btn_fullscreen = QPushButton(" ⛶ ")
         self.btn_fullscreen.setFixedSize(40, 40)
@@ -161,6 +188,7 @@ class F1TVApp(QMainWindow):
         ctrl_layout.addWidget(self.btn_play)
         ctrl_layout.addWidget(self.slider)
         ctrl_layout.addWidget(btn_vol)
+        ctrl_layout.addWidget(self.btn_mini)
         ctrl_layout.addWidget(self.btn_fullscreen)
 
         # 4. Footer
@@ -179,14 +207,52 @@ class F1TVApp(QMainWindow):
         foot_layout.addStretch()
         foot_layout.addWidget(lbl_ver)
 
-        right_layout.addWidget(self.header_vid)
-        right_layout.addWidget(self.video_frame)
-        right_layout.addWidget(self.controls)
-        right_layout.addWidget(self.footer)
+        self.right_layout.addWidget(self.header_vid)
+        self.right_layout.addWidget(self.video_frame)
+        self.right_layout.addWidget(self.controls)
+        self.right_layout.addWidget(self.footer)
 
         main_layout.addWidget(right_area)
 
     # --- LÓGICA DE NEGOCIO ---
+
+    def toggle_mini_player(self):
+        if self.mini_window is None:
+            self.start_mini_mode()
+        else:
+            self.stop_mini_mode()
+
+    def start_mini_mode(self):
+        # Crear ventana mini
+        self.mini_window = MiniPlayerWindow(self)
+        
+        # Mover video_frame a la ventana mini
+        # Al añadirlo al nuevo layout, se reparenta automáticamente
+        self.mini_window.layout.addWidget(self.video_frame) 
+        self.mini_window.show()
+        
+        # Actualizar HWND de VLC porque la ventana nativa ha cambiado (o su padre)
+        if sys.platform == "win32":
+            # A veces requiere stop/play para pillar el nuevo HWND correctamente
+             pass # Probamos sin stop primero, suele funcionar al ser el mismo widget ID
+             self.player.set_hwnd(self.video_frame.winId())
+        
+        self.btn_mini.setStyleSheet("color: #E10600; font-size: 16px; background: transparent; border: none;") # Rojo activo
+
+    def stop_mini_mode(self):
+        if self.mini_window:
+            # Recuperar video_frame
+            # Insertar de nuevo en el layout principal (Posición 1, después del header)
+            self.right_layout.insertWidget(1, self.video_frame)
+            
+            self.mini_window.hide()
+            self.mini_window = None
+            
+            # Restaurar HWND
+            if sys.platform == "win32":
+                 self.player.set_hwnd(self.video_frame.winId())
+            
+            self.btn_mini.setStyleSheet("color: white; font-size: 16px; background: transparent; border: none;")
 
     def toggle_fullscreen(self):
         if self.isFullScreen():
