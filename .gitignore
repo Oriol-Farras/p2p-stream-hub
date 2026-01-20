@@ -1,0 +1,30 @@
+# IPTV Playlist (User specific)
+Canales.m3u
+*.m3u
+*.m3u8
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment variables
+.env
+
+# IDEs
+.vscode/
+.idea/
+
+# Logs
+*.log
+acestream.log
+
+# Temporary files
+*.tmp
