@@ -170,12 +170,12 @@ class F1TVApp(QMainWindow):
         foot_layout = QHBoxLayout(self.footer)
         foot_layout.setContentsMargins(20, 0, 20, 0)
         
-        lbl_stats = QLabel("SIGNAL: EXCELLENT  |  LATENCY: 1.2S  |  1080P @ 60FPS")
-        lbl_stats.setProperty("class", "FooterText")
+        self.lbl_stats = QLabel("READY")
+        self.lbl_stats.setProperty("class", "FooterText")
         lbl_ver = QLabel("v5.0.0 PRO")
         lbl_ver.setProperty("class", "FooterText")
         
-        foot_layout.addWidget(lbl_stats)
+        foot_layout.addWidget(self.lbl_stats)
         foot_layout.addStretch()
         foot_layout.addWidget(lbl_ver)
 
@@ -349,6 +349,46 @@ class F1TVApp(QMainWindow):
             self.btn_play.setText("II")
 
     def update_progress(self):
+        # == ACTUALIZACIÓN DE ESTADÍSTICAS EN TIEMPO REAL ==
+        try:
+            state_obj = self.player.get_state()
+            # Convertir enum a string (ej: State.Playing -> PLAYING)
+            state_str = str(state_obj).split('.')[-1].upper()
+            
+            # Obtener métricas
+            fps = self.player.get_fps()
+            w, h = self.player.video_get_size(0)
+            
+            # Formatear texto
+            stats_text = f"STATUS: {state_str}"
+            if w > 0 and h > 0:
+                stats_text += f"  |  RES: {w}x{h}"
+            if fps > 0:
+                stats_text += f"  |  FPS: {fps:.2f}"
+            
+            # Mostrar también buffering si está cargando
+            if state_obj == vlc.State.Buffering:
+                 stats_text += " (BUFFERING...)"
+                 
+            self.lbl_stats.setText(stats_text)
+            
+            # Colorear según estado con tonos más integrados
+            if state_obj == vlc.State.Playing:
+                # Usar blanco/gris claro para que parezca nativo, no un aviso
+                self.lbl_stats.setStyleSheet("color: #e2e8f0; font-weight: 600; font-size: 10px;")
+            elif state_obj == vlc.State.Error:
+                # Rojo suave (Tailwind red-500)
+                self.lbl_stats.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 10px;")
+            elif state_obj == vlc.State.Buffering:
+                 # Ambar suave
+                 self.lbl_stats.setStyleSheet("color: #fbbf24; font-weight: 600; font-size: 10px;")
+            else:
+                self.lbl_stats.setStyleSheet("color: #64748b; font-size: 10px;") # Slate-500 para idle
+                
+        except Exception:
+            pass
+
+        # == LOGICA BARRA DE PROGRESO (SLIDER) ==
         if self.player.is_playing() and not self.is_paused_by_slider:
             if self.player.get_length() > 0:
                 pos = self.player.get_position()
