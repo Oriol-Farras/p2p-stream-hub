@@ -80,7 +80,6 @@ class ChannelWidget(QFrame):
         future = LOGO_DOWNLOAD_POOL.submit(download_logo_sync, url)
         self.logo_watcher = LogoWatcher(future, self) # Parent self para cleanup automático
         self.logo_watcher.finished.connect(self.on_logo_loaded)
-        self.logo_watcher.start()
 
     def on_logo_loaded(self, pixmap):
         if pixmap:

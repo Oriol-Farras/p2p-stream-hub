@@ -44,4 +44,53 @@ QSlider::handle:horizontal { background: white; width: 10px; height: 10px; margi
 /* FOOTER */
 QFrame#Footer { background-color: #000000; border-top: 1px solid #2A2A2A; }
 QLabel.FooterText { font-size: 10px; font-weight: bold; color: #64748b; letter-spacing: 1px; }
+
+/* COMBOBOX PLAYLISTS */
+QComboBox {
+    background-color: #1e1e24;
+    border: 1px solid #2A2A2A;
+    border-radius: 8px;
+    padding: 10px 12px;
+    padding-right: 35px;
+    color: white;
+    font-weight: bold;
+    font-size: 13px;
+}
+QComboBox:hover { 
+    border: 1px solid #E10600;
+}
+QComboBox::drop-down { 
+    border: none;
+    width: 30px;
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+}
+QComboBox::down-arrow { 
+    image: none;
+    border-left: 5px solid transparent; 
+    border-right: 5px solid transparent; 
+    border-top: 6px solid #94a3b8;
+    width: 0;
+    height: 0;
+}
+QComboBox:hover::down-arrow {
+    border-top-color: #E10600;
+}
+QComboBox QAbstractItemView {
+    background-color: #1e1e24;
+    color: white;
+    selection-background-color: #E10600;
+    selection-color: white;
+    border: 1px solid #2A2A2A;
+    border-radius: 4px;
+    padding: 4px;
+    outline: none;
+}
+QComboBox QAbstractItemView::item {
+    padding: 8px;
+    border-radius: 4px;
+}
+QComboBox QAbstractItemView::item:hover {
+    background-color: #2A2A2A;
+}
 """

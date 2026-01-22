@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import requests
-from PyQt6.QtCore import QThread, pyqtSignal, Qt
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal, Qt
 from PyQt6.QtGui import QImage, QPixmap
 
 # Pool global para limitar descargas concurrentes
@@ -22,18 +22,27 @@ def download_logo_sync(url):
     except: pass
     return None
 
-class LogoWatcher(QThread):
-    """Vigila la descarga (Future) y emite señal en el hilo principal cuando termina"""
+class LogoWatcher(QObject):
+    """Vigila la descarga (Future) usando un Timer en lugar de bloquear un QThread"""
     finished = pyqtSignal(object)
     
     def __init__(self, future, parent=None):
         super().__init__(parent)
         self.future = future
+        self.timer = QTimer(self)
+        self.timer.setInterval(200) # Chequear cada 200ms
+        self.timer.timeout.connect(self.check_status)
+        self.timer.start()
     
-    def run(self):
-        try:
-            result = self.future.result()
-            if result: 
-                self.finished.emit(result)
-        except Exception:
-            pass
+    def check_status(self):
+        if self.future.done():
+            self.timer.stop()
+            try:
+                result = self.future.result()
+                if result: 
+                    self.finished.emit(result)
+            except Exception:
+                pass
+            # Auto-eliminarse tras completar si no tiene padre o para limpiar
+            if not self.parent():
+                self.deleteLater()

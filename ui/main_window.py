@@ -5,7 +5,7 @@ import vlc
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QSlider, QFrame, QLabel, QLineEdit, 
-                             QScrollArea, QSizePolicy)
+                             QScrollArea, QSizePolicy, QComboBox)
 from PyQt6.QtCore import Qt, QTimer, QSize, QThread, pyqtSignal
 from PyQt6.QtGui import QCursor, QIcon
 
@@ -56,8 +56,8 @@ class F1TVApp(QMainWindow):
         self.timer.timeout.connect(self.update_progress)
         self.is_paused_by_slider = False
         
-        # Cargar M3U diferido
-        QTimer.singleShot(100, lambda: self.load_playlist("Canales.m3u"))
+        # Cargar Listas M3U (Ahora busca todas las disponibles)
+        QTimer.singleShot(100, self.load_playlists_list)
         
         # Pre-calentar motor AceStream al inicio (sin bloquear)
         AceStreamHandler.start_engine()
@@ -94,6 +94,13 @@ class F1TVApp(QMainWindow):
         header_box.addWidget(lbl_logo)
         header_box.addStretch()
         side_layout.addLayout(header_box)
+
+        # Playlist Selector
+        self.playlist_combo = QComboBox()
+        self.playlist_combo.setPlaceholderText("Select Playlist")
+        self.playlist_combo.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.playlist_combo.currentIndexChanged.connect(self.on_playlist_changed)
+        side_layout.addWidget(self.playlist_combo)
 
         # Search
         self.search_input = QLineEdit()
@@ -278,12 +285,64 @@ class F1TVApp(QMainWindow):
             self.toggle_fullscreen()
         super().keyPressEvent(event)
 
+    # --- NUEVAS FUNCIONALIDADES MULTI-LISTA ---
+
+    def load_playlists_list(self):
+        """Busca archivos .m3u y .m3u8 en la carpeta 'playlists' y llena el Combo."""
+        self.playlist_combo.blockSignals(True)
+        self.playlist_combo.clear()
+        
+        playlist_dir = "playlists"
+        if not os.path.exists(playlist_dir):
+            os.makedirs(playlist_dir)
+
+        found_lists = []
+        try:
+             files = os.listdir(playlist_dir)
+             for f in files:
+                 if f.lower().endswith(('.m3u', '.m3u8')):
+                     found_lists.append(f)
+        except Exception as e:
+            print(f"Error buscando listas: {e}")
+
+        if not found_lists:
+             self.playlist_combo.addItem("No playlists found")
+             self.playlist_combo.setEnabled(False)
+        else:
+            found_lists.sort()
+            
+            # Añadir items: Texto limpio (sin ext) -> Data (filename real)
+            default_index = 0
+            for i, f in enumerate(found_lists):
+                name_clean = os.path.splitext(f)[0] # Remover extensión
+                self.playlist_combo.addItem(name_clean, f)
+                
+                if f == "Canales.m3u":
+                    default_index = i
+            
+            self.playlist_combo.setCurrentIndex(default_index)
+            self.playlist_combo.setEnabled(True)
+            
+            # Cargar explicito la primera vez
+            self.load_playlist(found_lists[default_index])
+
+        self.playlist_combo.blockSignals(False)
+
+    def on_playlist_changed(self, index):
+        if index < 0: return
+        # Obtener el filename real desde la data, no el texto mostrado
+        filename = self.playlist_combo.itemData(index)
+        if filename:
+            print(f"Cambiando a lista: {filename}")
+            self.load_playlist(filename)
+
     def load_playlist(self, filename):
-        if not os.path.exists(filename):
-            print(f"No se encontró {filename}")
+        full_path = os.path.join("playlists", filename)
+        if not os.path.exists(full_path):
+            print(f"No se encontró {full_path}")
             return
 
-        with open(filename, 'r', encoding='utf-8') as f:
+        with open(full_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
 
         current_title = ""
@@ -293,7 +352,9 @@ class F1TVApp(QMainWindow):
         # Limpiar UI anterior
         for i in reversed(range(self.scroll_layout.count())): 
             w = self.scroll_layout.itemAt(i).widget()
-            if w: w.setParent(None)
+            if w:
+                w.setParent(None)
+                w.deleteLater()
         self.channel_widgets = []
 
         for line in lines:
